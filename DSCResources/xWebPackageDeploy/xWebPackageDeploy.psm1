@@ -74,8 +74,18 @@ function Set-TargetResource
         [parameter(Mandatory = $true)]
         [System.String]
         $Destination,
+
+		[parameter(Mandatory = $false)]
+        [System.Boolean]
+        $Manifest,
+		
+       [Parameter(Mandatory = $false)]
+       [Microsoft.Management.Infrastructure.CimInstance[]]
+	   $Parameters,
+	   
+	   
         
-          [ValidateSet("Present","Absent")]
+        [ValidateSet("Present","Absent")]
         [System.String]
         $Ensure = "Present"
     )
@@ -85,24 +95,36 @@ function Set-TargetResource
     $app = "$env:PROGRAMFILES\IIS\Microsoft Web Deploy V3"
 
     $appCmd = Join-Path $app -ChildPath "msdeploy.exe"
-    $appCmd = "& '$appCmd'"   
+    $appCmd = "& '$appCmd'"
         
     if($Ensure -eq "Present")
     {
         #sync the given package content into iis
-        
-        if($Destination.Contains("\"))
-        {
-              #this is the case when iis site content path is specified
-             $appCmd += "-verb:sync -source:package=$SourcePath -dest:contentPath=$Destination"
+		
+		if($Manifest){
+			$appCmd += "-verb:sync -source:package=`"$($SourcePath)`" -dest:auto -disableLink:AppPoolExtension -disableLink:ContentExtension -disableLink:CertificateExtension -setParam:name=```"IIS Web Application Name```",value=```"$($Destination)```""
+		}
+        else {
+			if($Destination.Contains("\"))
+			{
+				  #this is the case when iis site content path is specified
+				 $appCmd += "-verb:sync -source:package=`"$($SourcePath)`" -dest:contentPath=`"$($Destination)`""
+			}
+			else
+			{
+				#this is the case when iis site name is specified
+				$appCmd += "-verb:sync -source:package='$($SourcePath)' -dest:iisApp='$($Destination)'"
+			}
+		}
+
+        if($Parameters -ne $null) {
+			foreach($param in $Parameters){
+				$appCmd += " -setParam:name=```"$($param.Key)```",value=```"$($param.Value)```""
+			}
         }
-        else
-        {
-            #this is the case when iis site name is specified
-            $appCmd += "-verb:sync -source:package=$SourcePath -dest:iisApp=$Destination"           
-        }
+
         Write-Verbose -Message $appCmd
-        Invoke-Expression $appCmd
+		Invoke-Expression $appCmd
 
     }
     else
@@ -146,7 +168,15 @@ function Test-TargetResource
         [parameter(Mandatory = $true)]
         [System.String]
         $Destination,
-
+		
+		[parameter(Mandatory = $false)]
+        [System.Boolean]
+        $Manifest,
+		
+		[Parameter(Mandatory = $false)]
+       [Microsoft.Management.Infrastructure.CimInstance[]]
+	   $Parameters,
+	   
         [ValidateSet("Present","Absent")]
         [System.String]
         $Ensure = "Present"
@@ -155,18 +185,23 @@ function Test-TargetResource
     $appCmd = "$env:PROGRAMFILES\IIS\Microsoft Web Deploy V3\msdeploy.exe"
 
     #get all the files from a given package
-    $packageFiles = & $appCmd -verb:dump "-source:package=$SourcePath"
+    $packageFiles = & $appCmd -verb:dump "-source:package=`"$SourcePath`""
  
     if($Ensure -eq "Present")
     {
-         #find all the files for a given site
-        $siteFiles = & $appCmd -verb:dump "-source:contentPath=$Destination"
-        # the packages exported using webdeploy tool, contain 2 extra entries with site name. Skipping those..
-        #compare based on the number of files
-        if(($packageFiles.Count -eq $siteFiles.Count) -or (($packageFiles.Count -2) -eq $siteFiles.Count) )
-        {
-            $result = $true
-        }
+		if($Manifest) {
+			$result = $false
+		}
+		else {
+			 #find all the files for a given site
+			$siteFiles = & $appCmd -verb:dump "-source:contentPath=`"$($Destination)`""
+			# the packages exported using webdeploy tool, contain 2 extra entries with site name. Skipping those..
+			#compare based on the number of files
+			if(($packageFiles.Count -eq $siteFiles.Count) -or (($packageFiles.Count -2) -eq $siteFiles.Count) )
+			{
+				$result = $true
+			}
+		}
      }   
     else
     {       

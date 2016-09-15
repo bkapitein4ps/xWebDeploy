@@ -40,7 +40,15 @@ Configuration xWebDeploy
 
         [Parameter(Mandatory = $true)]
         [string] $Destination,
+		
+		[Parameter(Mandatory = $false)]
+        [bool] $Manifest,
+		
+		[Parameter(Mandatory = $false)]
+        [Microsoft.Management.Infrastructure.CimInstance[]] $Parameters,
 
+		
+		
         [Parameter(Mandatory = $true)]
         [Validateset("Present","Absent")]
         [String]
@@ -63,6 +71,8 @@ Configuration xWebDeploy
        {
             SourcePath = $SourcePath
             Destination = $Destination
+			Manifest = $Manifest
+			Parameters = $Parameters
             Ensure = $Ensure
 
        } 
